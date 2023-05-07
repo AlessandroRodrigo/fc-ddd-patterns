@@ -5,8 +5,42 @@ import OrderItemModel from "./order-item.model";
 import OrderModel from "./order.model";
 
 export default class OrderRepository implements OrderRepositoryInterface {
-  update(entity: Order): Promise<void> {
-    throw new Error("Method not implemented.");
+  async update(entity: Order): Promise<void> {
+    await OrderModel.update(
+      {
+        customer_id: entity.customerId,
+        total: entity.total(),
+      },
+      { where: { id: entity.id } }
+    );
+
+    for (const item of entity.items) {
+      const foundOrderItem = await OrderItemModel.findOne({
+        where: { id: item.id },
+      });
+
+      if (!foundOrderItem) {
+        await OrderItemModel.create({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          product_id: item.productId,
+          quantity: item.quantity,
+          order_id: entity.id,
+        });
+        continue;
+      }
+
+      await OrderItemModel.update(
+        {
+          name: item.name,
+          price: item.price,
+          product_id: item.productId,
+          quantity: item.quantity,
+        },
+        { where: { id: item.id } }
+      );
+    }
   }
 
   async find(id: string): Promise<Order> {
