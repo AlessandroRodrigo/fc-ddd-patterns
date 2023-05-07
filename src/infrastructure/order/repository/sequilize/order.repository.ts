@@ -12,6 +12,7 @@ export default class OrderRepository implements OrderRepositoryInterface {
   async find(id: string): Promise<Order> {
     const orderModel = await OrderModel.findOne({
       where: { id },
+      include: [{ model: OrderItemModel }],
     });
 
     return new Order(
