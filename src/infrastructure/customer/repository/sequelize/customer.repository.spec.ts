@@ -3,6 +3,10 @@ import Customer from "../../../../domain/customer/entity/customer";
 import Address from "../../../../domain/customer/value-object/address";
 import CustomerModel from "./customer.model";
 import CustomerRepository from "./customer.repository";
+import EventDispatcher from "../../../../domain/@shared/event/event-dispatcher";
+import CustomerCreatedEvent from "../../../../domain/customer/event/consumer-created.event";
+import SendConsoleWhenConsumerIsCreatedFirst from "../../../../domain/customer/event/handler/send-console-when-consumer-is-created-1.handler";
+import SendConsoleWhenConsumerIsCreatedSecond from "../../../../domain/customer/event/handler/send-console-when-consumer-is-created-2.handler";
 
 describe("Customer repository test", () => {
   let sequelize: Sequelize;
@@ -30,6 +34,8 @@ describe("Customer repository test", () => {
     customer.Address = address;
     await customerRepository.create(customer);
 
+    const customerCreatedEvent = new CustomerCreatedEvent(customer);
+
     const customerModel = await CustomerModel.findOne({ where: { id: "123" } });
 
     expect(customerModel.toJSON()).toStrictEqual({
@@ -42,6 +48,45 @@ describe("Customer repository test", () => {
       zipcode: address.zip,
       city: address.city,
     });
+  });
+
+  it("should notify when a new customer is created", async () => {
+    const eventDispatcher = new EventDispatcher();
+    const spyOnFirstHandler = jest.spyOn(
+      SendConsoleWhenConsumerIsCreatedFirst.prototype,
+      "handle"
+    );
+    const spyOnSecondHandler = jest.spyOn(
+      SendConsoleWhenConsumerIsCreatedSecond.prototype,
+      "handle"
+    );
+
+    const sendLogWhenCustomerIsCreated =
+      new SendConsoleWhenConsumerIsCreatedFirst();
+    eventDispatcher.register(
+      "CustomerCreatedEvent",
+      sendLogWhenCustomerIsCreated
+    );
+
+    const sendConsoleWhenConsumerIsCreatedSecond =
+      new SendConsoleWhenConsumerIsCreatedSecond();
+    eventDispatcher.register(
+      "CustomerCreatedEvent",
+      sendConsoleWhenConsumerIsCreatedSecond
+    );
+
+    const customerRepository = new CustomerRepository();
+    const customer = new Customer("123", "Customer 1");
+    const address = new Address("Street 1", 1, "Zipcode 1", "City 1");
+    customer.Address = address;
+    await customerRepository.create(customer);
+
+    const customerCreatedEvent = new CustomerCreatedEvent(customer);
+
+    eventDispatcher.notify(customerCreatedEvent);
+
+    expect(spyOnFirstHandler).toHaveBeenCalled();
+    expect(spyOnSecondHandler).toHaveBeenCalled();
   });
 
   it("should update a customer", async () => {
